@@ -4,6 +4,13 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>DKK ↔ EUR Rechner</title>
+  <link rel="manifest" href="manifest.json" />
+  <link rel="apple-touch-icon" href="icon-180.png" />
+  <link rel="icon" href="icon-180.png" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="DKK↔EUR" />
+  <meta name="theme-color" content="#c60c30" />
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body {
@@ -86,6 +93,64 @@
       margin-top: 20px;
       line-height: 1.6;
     }
+    .btn-scan {
+      width: 100%;
+      padding: 14px;
+      border-radius: 16px;
+      border: none;
+      background: #003399;
+      color: #fff;
+      font-size: 1rem;
+      font-weight: 700;
+      cursor: pointer;
+      margin-bottom: 16px;
+      letter-spacing: 0.5px;
+    }
+    .modal {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.85);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+      z-index: 10;
+    }
+    .modal.hidden { display: none; }
+    .modal-content {
+      background: #111;
+      border-radius: 16px;
+      padding: 16px;
+      width: 100%;
+      max-width: 420px;
+    }
+    .modal-content video {
+      width: 100%;
+      border-radius: 12px;
+      background: #000;
+    }
+    .scan-status {
+      color: #fff;
+      font-size: 0.85rem;
+      text-align: center;
+      min-height: 1.4em;
+      margin: 10px 0;
+    }
+    .modal-actions {
+      display: flex;
+      gap: 10px;
+    }
+    .modal-actions button {
+      flex: 1;
+      padding: 12px;
+      border-radius: 12px;
+      border: none;
+      font-size: 0.95rem;
+      font-weight: 700;
+      cursor: pointer;
+    }
+    #captureBtn { background: #d4af37; color: #1a1a2e; }
+    #closeCameraBtn { background: rgba(255,255,255,0.15); color: #fff; }
   </style>
 </head>
 <body>
@@ -95,6 +160,8 @@
       <h1>Währungsrechner</h1>
       <p>Dänische Krone ↔ Euro</p>
     </div>
+
+    <button class="btn-scan" id="scanBtn">📷 Preis scannen</button>
 
     <div class="card">
       <div class="card-header">
@@ -116,14 +183,53 @@
 
     <button class="btn-clear" onclick="clearAll()">✕ Zurücksetzen</button>
 
-    <p class="info">
-      Kurs: 1 DKK = 0,13408 EUR &nbsp;|&nbsp; 1 EUR ≈ 7,4584 DKK<br>
-      <span style="font-size:0.7rem">Basierend auf dem EZB-Leitkurs (fester Wechselkurs)</span>
+    <p class="info" id="rateInfo">
+      Kurs wird geladen …
     </p>
   </div>
 
+  <div class="modal hidden" id="cameraModal">
+    <div class="modal-content">
+      <video id="video" autoplay playsinline muted></video>
+      <canvas id="canvas" style="display:none"></canvas>
+      <div class="scan-status" id="scanStatus"></div>
+      <div class="modal-actions">
+        <button id="captureBtn">📸 Erfassen</button>
+        <button id="closeCameraBtn">✕ Schließen</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
   <script>
-    const RATE = 0.13408;
+    const FALLBACK_RATE = 0.13408;
+    let RATE = FALLBACK_RATE;
+    const rateInfo = document.getElementById('rateInfo');
+
+    function renderRateInfo(rate, source, timestamp) {
+      const inv = (1 / rate).toFixed(4);
+      const time = timestamp ? new Date(timestamp).toLocaleString('de-DE') : '';
+      rateInfo.innerHTML =
+        `Kurs: 1 DKK = ${rate.toFixed(5)} EUR &nbsp;|&nbsp; 1 EUR ≈ ${inv} DKK<br>` +
+        `<span style="font-size:0.7rem">${source}${time ? ' · Stand: ' + time : ''}</span>`;
+    }
+
+    async function loadRate() {
+      try {
+        const res = await fetch('https://api.frankfurter.app/latest?from=DKK&to=EUR');
+        if (!res.ok) throw new Error('API-Fehler ' + res.status);
+        const data = await res.json();
+        const rate = data.rates && data.rates.EUR;
+        if (!rate) throw new Error('Kein Kurs in der Antwort');
+        RATE = rate;
+        renderRateInfo(RATE, 'Live-Kurs (EZB via frankfurter.app)', data.date);
+      } catch (err) {
+        RATE = FALLBACK_RATE;
+        renderRateInfo(RATE, 'Live-Kurs nicht verfügbar – fester Referenzkurs wird verwendet');
+      }
+      convertFromDKK();
+    }
+
     function convertFromDKK() {
       const v = parseFloat(document.getElementById('dkk').value);
       document.getElementById('eur').value = isNaN(v) ? '' : (v * RATE).toFixed(2);
@@ -136,6 +242,83 @@
       document.getElementById('dkk').value = '';
       document.getElementById('eur').value = '';
     }
+
+    // --- Preis-Scanner (Kamera + OCR) ---
+    const video = document.getElementById('video');
+    const canvas = document.getElementById('canvas');
+    const cameraModal = document.getElementById('cameraModal');
+    const scanStatus = document.getElementById('scanStatus');
+    let cameraStream = null;
+    let ocrWorker = null;
+
+    async function getOcrWorker() {
+      if (!ocrWorker) {
+        scanStatus.textContent = 'OCR wird geladen …';
+        ocrWorker = await Tesseract.createWorker('eng');
+        await ocrWorker.setParameters({ tessedit_char_whitelist: '0123456789.,' });
+      }
+      return ocrWorker;
+    }
+
+    function parsePriceFromText(text) {
+      const matches = text.match(/\d+(?:[.,]\d{1,2})?/g);
+      if (!matches || matches.length === 0) return null;
+      const numbers = matches.map(m => parseFloat(m.replace(',', '.'))).filter(n => !isNaN(n));
+      if (numbers.length === 0) return null;
+      return Math.max(...numbers);
+    }
+
+    async function openCamera() {
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        alert('Kamera-Zugriff wird von diesem Browser nicht unterstützt (erfordert HTTPS).');
+        return;
+      }
+      try {
+        cameraStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+        video.srcObject = cameraStream;
+        scanStatus.textContent = '';
+        cameraModal.classList.remove('hidden');
+      } catch (err) {
+        alert('Kamera konnte nicht gestartet werden: ' + err.message);
+      }
+    }
+
+    function closeCamera() {
+      if (cameraStream) {
+        cameraStream.getTracks().forEach(t => t.stop());
+        cameraStream = null;
+      }
+      cameraModal.classList.add('hidden');
+    }
+
+    async function captureAndRecognize() {
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+      canvas.getContext('2d').drawImage(video, 0, 0, canvas.width, canvas.height);
+
+      try {
+        const worker = await getOcrWorker();
+        scanStatus.textContent = 'Erkenne Preis …';
+        const { data: { text } } = await worker.recognize(canvas);
+        const price = parsePriceFromText(text);
+        if (price === null) {
+          scanStatus.textContent = 'Kein Preis erkannt. Bitte erneut versuchen oder manuell eingeben.';
+          return;
+        }
+        document.getElementById('dkk').value = price;
+        convertFromDKK();
+        scanStatus.textContent = `Erkannt: ${price} DKK`;
+        setTimeout(closeCamera, 800);
+      } catch (err) {
+        scanStatus.textContent = 'Fehler bei der Erkennung: ' + err.message;
+      }
+    }
+
+    document.getElementById('scanBtn').addEventListener('click', openCamera);
+    document.getElementById('captureBtn').addEventListener('click', captureAndRecognize);
+    document.getElementById('closeCameraBtn').addEventListener('click', closeCamera);
+
+    loadRate();
   </script>
 </body>
 </html>
