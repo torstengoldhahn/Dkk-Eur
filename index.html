@@ -116,14 +116,40 @@
 
     <button class="btn-clear" onclick="clearAll()">✕ Zurücksetzen</button>
 
-    <p class="info">
-      Kurs: 1 DKK = 0,13408 EUR &nbsp;|&nbsp; 1 EUR ≈ 7,4584 DKK<br>
-      <span style="font-size:0.7rem">Basierend auf dem EZB-Leitkurs (fester Wechselkurs)</span>
+    <p class="info" id="rateInfo">
+      Kurs wird geladen …
     </p>
   </div>
 
   <script>
-    const RATE = 0.13408;
+    const FALLBACK_RATE = 0.13408;
+    let RATE = FALLBACK_RATE;
+    const rateInfo = document.getElementById('rateInfo');
+
+    function renderRateInfo(rate, source, timestamp) {
+      const inv = (1 / rate).toFixed(4);
+      const time = timestamp ? new Date(timestamp).toLocaleString('de-DE') : '';
+      rateInfo.innerHTML =
+        `Kurs: 1 DKK = ${rate.toFixed(5)} EUR &nbsp;|&nbsp; 1 EUR ≈ ${inv} DKK<br>` +
+        `<span style="font-size:0.7rem">${source}${time ? ' · Stand: ' + time : ''}</span>`;
+    }
+
+    async function loadRate() {
+      try {
+        const res = await fetch('https://api.frankfurter.app/latest?from=DKK&to=EUR');
+        if (!res.ok) throw new Error('API-Fehler ' + res.status);
+        const data = await res.json();
+        const rate = data.rates && data.rates.EUR;
+        if (!rate) throw new Error('Kein Kurs in der Antwort');
+        RATE = rate;
+        renderRateInfo(RATE, 'Live-Kurs (EZB via frankfurter.app)', data.date);
+      } catch (err) {
+        RATE = FALLBACK_RATE;
+        renderRateInfo(RATE, 'Live-Kurs nicht verfügbar – fester Referenzkurs wird verwendet');
+      }
+      convertFromDKK();
+    }
+
     function convertFromDKK() {
       const v = parseFloat(document.getElementById('dkk').value);
       document.getElementById('eur').value = isNaN(v) ? '' : (v * RATE).toFixed(2);
@@ -136,6 +162,8 @@
       document.getElementById('dkk').value = '';
       document.getElementById('eur').value = '';
     }
+
+    loadRate();
   </script>
 </body>
 </html>
