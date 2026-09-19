@@ -12,7 +12,8 @@ Umrechnung in beide Richtungen zum festen EZB-Leitkurs (1 DKK = 0,13408 EUR).
 Sprechen, und der Text entsteht automatisch mit.
 
 - **Automatische Verschriftlichung** über die Spracherkennung des Browsers
-  (Web Speech API) — läuft in Chrome, Edge und Safari, nicht in Firefox.
+  (Web Speech API) — läuft in Safari, Chrome und Edge; nicht in Firefox und nicht in
+  Chrome auf dem iPhone.
 - **Automatische Formatierung**: Satzzeichen ohne Abstand davor, Großschreibung
   am Satzanfang, saubere Absätze.
 - **Satzzeichen-Befehle**: „Punkt“, „Komma“, „Fragezeichen“, „Klammer auf“,
@@ -26,14 +27,76 @@ Sprechen, und der Text entsteht automatisch mit.
 - **Verlauf**: jedes beendete Diktat wird abgelegt und lässt sich später mit einem Klick
   kopieren oder zurück in den Editor holen.
 - **In Claude öffnen** startet mit dem diktierten Text direkt eine neue Unterhaltung.
-- Export als `.txt` oder `.md`, neun Diktiersprachen, Hell-/Dunkelmodus,
-  `Strg`+`M` zum Starten und Stoppen.
+- **Teilen** über das Teilen-Blatt des Systems (auf iPhone und iPad der direkte Weg
+  in jede andere App), Export als `.txt` oder `.md`.
+- Neun Diktiersprachen, Hell-/Dunkelmodus, `Strg`+`M` zum Starten und Stoppen,
+  auf dem Telefon Daumen-taugliche Knöpfe und „Zum Home-Bildschirm“ als App.
 
 Das Mikrofon muss einmalig freigegeben werden. Beim Öffnen per `file://` verweigern
 manche Browser den Mikrofonzugriff — dann kurz lokal ausliefern, z. B.
 `python3 -m http.server`, und `http://localhost:8000/diktat.html` aufrufen.
 
-## `diktiergeraet.py` — Diktat in jedes Programm
+## Auf dem iPhone und iPad
+
+Zuerst das Wichtigste, damit niemand etwas nachbaut, was schon da ist: **iOS diktiert
+selbst.** Die Mikrofon-Taste rechts unten auf der Bildschirmtastatur schreibt in *jedes*
+Textfeld — auch direkt in die Claude-App. Für „kurz etwas hineinsprechen“ ist das der
+schnellste Weg, ganz ohne dieses Projekt.
+
+Was iOS dabei **nicht** tut: Füllwörter entfernen, den Text aufräumen und ihn für später
+aufbewahren. Dafür gibt es hier zwei Wege.
+
+### Weg 1: `diktat.html` als App auf dem Home-Bildschirm
+
+1. Die Seite in **Safari** öffnen (Chrome auf dem iPhone kann keine Spracherkennung).
+2. Teilen-Symbol → **„Zum Home-Bildschirm“**. Dann startet Diktat ohne Safari-Leisten,
+   mit eigenem Symbol.
+3. Beim ersten Start einmal Mikrofon und Spracherkennung erlauben.
+
+Danach: Knopf drücken, sprechen, Knopf drücken. Der Text ist aufgeräumt, liegt in der
+Zwischenablage und im Verlauf. **Teilen** öffnet das Teilen-Blatt — von dort geht der Text
+an Claude, Notizen, Mail, Nachrichten oder sonst wohin. **In Claude öffnen** startet damit
+direkt eine neue Unterhaltung.
+
+Zwei Eigenheiten von Safari: Es beendet die Erkennung nach längeren Sprechpausen von
+selbst. Die Seite fängt das ab, legt den Text im Verlauf ab und wartet mit
+„Weiter zuhören“ auf einen Tipper — nichts geht verloren. Und der Bildschirm sollte
+an bleiben, sonst hört Safari auf zuzuhören.
+
+Damit die Seite aufs Telefon kommt, braucht sie eine Adresse. Am einfachsten über
+GitHub Pages (Repository → Settings → Pages → Branch wählen); danach liegt sie unter
+`https://<benutzername>.github.io/Dkk-Eur/diktat.html`.
+
+### Weg 2: Kurzbefehl — ein Tipp, und der Text ist fertig
+
+Das kommt dem „automatisch einfügen“ vom Rechner am nächsten und braucht keine Webseite.
+In der App **Kurzbefehle** einen neuen Kurzbefehl namens „Diktat“ anlegen:
+
+1. **Text diktieren** — Sprache Deutsch, Anhalten „nach kurzer Pause“.
+2. **Text ersetzen** — Suchen nach `\s*\b(ähm+|äh+|öhm?|hm+|mhm)\b`, ersetzen durch nichts,
+   dabei *Regulärer Ausdruck* einschalten und Groß-/Kleinschreibung ignorieren.
+3. **In die Zwischenablage kopieren** — danach genügt langes Tippen und „Einsetzen“.
+4. Optional **An Notiz anhängen** für ein Archiv aller Diktate.
+5. Optional für den direkten Weg zu Claude: **URL codieren**, dann **Text** mit
+   `https://claude.ai/new?q=` davor, dann **URL öffnen**.
+
+Auslösen lässt sich das ohne jedes Tippen auf einem Symbol:
+
+- **Auf Rückseite tippen**: Einstellungen → Bedienungshilfen → Tippen →
+  Auf Rückseite tippen → Doppeltippen → „Diktat“.
+- **Actionstaste** (iPhone 15 Pro und neuer): Einstellungen → Actionstaste → Kurzbefehl.
+- **Siri**: „Hey Siri, Diktat“.
+
+Die Namen der Aktionen wandern zwischen den iOS-Versionen manchmal leicht; die
+Reihenfolge bleibt.
+
+### Was auf iOS nicht geht
+
+`diktiergeraet.py` läuft dort nicht. iOS lässt kein Programm im Hintergrund auf einen
+Hotkey lauschen und in fremde Apps tippen — das ist eine Grenze des Systems, keine
+fehlende Zeile Code. Der Kurzbefehl oben ist der Ersatz dafür.
+
+## `diktiergeraet.py` — Diktat in jedes Programm (Mac, Windows, Linux)
 
 Was eine Webseite nicht darf: Text in ein **fremdes** Fenster schreiben. Dieses kleine
 Programm kann es. Hotkey drücken, sprechen, Hotkey drücken — der Text erscheint dort,

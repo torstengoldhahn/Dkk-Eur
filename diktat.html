@@ -2,8 +2,16 @@
 <html lang="de">
 <head>
 <meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
 <title>Diktat</title>
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-title" content="Diktat" />
+<meta name="apple-mobile-web-app-status-bar-style" content="default" />
+<meta name="theme-color" content="#f4f5f9" media="(prefers-color-scheme: light)" />
+<meta name="theme-color" content="#101117" media="(prefers-color-scheme: dark)" />
+<link rel="apple-touch-icon" href="icon.png" />
+<link rel="icon" href="icon.png" />
 <style>
   :root {
     --bg: #f4f5f9;
@@ -48,15 +56,20 @@
   }
 
   * { box-sizing: border-box; margin: 0; padding: 0; }
+  [hidden] { display: none !important; }
   html, body { background: var(--bg); }
+  html { -webkit-text-size-adjust: 100%; }
   body {
     min-height: 100vh;
     color: var(--text);
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
     font-size: 15px;
     line-height: 1.5;
-    padding: 24px 16px 48px;
+    -webkit-tap-highlight-color: transparent;
+    padding: calc(24px + env(safe-area-inset-top)) calc(16px + env(safe-area-inset-right))
+             calc(48px + env(safe-area-inset-bottom)) calc(16px + env(safe-area-inset-left));
   }
+  button { -webkit-tap-highlight-color: transparent; touch-action: manipulation; }
   .wrap { max-width: 780px; margin: 0 auto; }
 
   header { display: flex; align-items: center; gap: 12px; margin-bottom: 20px; }
@@ -182,12 +195,33 @@
   }
   .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
 
+  @media (max-width: 560px) {
+    body { padding-top: calc(16px + env(safe-area-inset-top)); }
+    .panel { padding: 15px; border-radius: 14px; }
+    .controls { gap: 10px; }
+    .mic { flex: 1 1 100%; justify-content: center; padding: 17px 22px; font-size: 1.05rem; }
+    .status { order: 3; flex-basis: 100%; }
+    #lang { flex: 1; }
+    .opts { gap: 10px 16px; }
+    .actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+    .actions .btn { padding: 13px 10px; text-align: center; }
+    textarea { min-height: 220px; font-size: 1.05rem; }
+    .hist li { flex-wrap: wrap; }
+    .hist .prev { flex-basis: 100%; order: 2; white-space: normal; }
+    .hist .when { order: 1; }
+    .hist .mini { order: 3; padding: 9px 12px; }
+    .hist li .mini:first-of-type { margin-left: auto; }
+  }
+
   .banner {
     background: var(--accent-soft); color: var(--text);
     border: 1px solid var(--border); border-radius: 12px;
     padding: 14px 16px; margin-bottom: 16px; font-size: .88rem; line-height: 1.6;
   }
   .banner b { color: var(--rec); }
+  .banner.tipp { display: flex; gap: 12px; align-items: flex-start; }
+  .banner.tipp b { color: var(--accent); }
+  .banner.tipp .btn { flex: none; }
 </style>
 </head>
 <body>
@@ -206,10 +240,22 @@
     </button>
   </header>
 
+  <div id="iosTipp" class="banner tipp" hidden>
+    <span style="flex:1">
+      <b>Tipp fürs iPhone:</b>
+      Über <b>Teilen</b> → <b>„Zum Home-Bildschirm“</b> läuft Diktat wie eine eigene App,
+      ohne Safari-Leisten. Der Knopf <b>Teilen</b> unten schickt das Diktierte direkt
+      an Claude, Notizen, Mail oder jede andere App.
+    </span>
+    <button class="btn" id="iosTippZu">Ok</button>
+  </div>
+
   <div id="unsupported" class="banner" hidden>
     <b>Dieser Browser kann nicht zuhören.</b><br>
-    Die Spracherkennung (Web Speech API) läuft derzeit in <b>Chrome</b>, <b>Edge</b> und <b>Safari</b>.
-    In Firefox ist sie nicht verfügbar. Der Texteditor unten funktioniert trotzdem.
+    Die Spracherkennung (Web Speech API) läuft in <b>Safari</b>, <b>Chrome</b> und <b>Edge</b> —
+    nicht in Firefox und nicht in Chrome auf dem iPhone.
+    <b>Auf iPhone und iPad bitte Safari verwenden.</b>
+    Der Texteditor unten funktioniert trotzdem.
   </div>
 
   <section class="panel">
@@ -256,6 +302,7 @@
 
     <div class="actions">
       <button class="btn primary" id="copyBtn">Kopieren</button>
+      <button class="btn" id="shareBtn" hidden>Teilen</button>
       <button class="btn" id="claudeBtn">In Claude öffnen</button>
       <button class="btn" id="keepBtn">Im Verlauf ablegen</button>
       <button class="btn" id="txtBtn">Als .txt</button>
@@ -302,8 +349,16 @@
   var textEl = $('text'), interimEl = $('interim'), statusEl = $('status'),
       micBtn = $('micBtn'), micLabel = $('micLabel'), timerEl = $('timer'), countEl = $('count');
 
+  // iPadOS meldet sich als Mac — der Touchscreen verrät es trotzdem.
+  var IST_IOS = /iP(hone|ad|od)/.test(navigator.platform || '') ||
+    (navigator.userAgent.indexOf('Mac') > -1 && 'ontouchend' in document) ||
+    /iPhone|iPad|iPod/.test(navigator.userAgent);
+  var ALS_APP = ('standalone' in navigator && navigator.standalone) ||
+    (window.matchMedia && matchMedia('(display-mode: standalone)').matches);
+
   var STORE_TEXT = 'diktat.text', STORE_OPTS = 'diktat.opts',
-      STORE_THEME = 'diktat.theme', STORE_HIST = 'diktat.verlauf';
+      STORE_THEME = 'diktat.theme', STORE_HIST = 'diktat.verlauf',
+      STORE_TIPP = 'diktat.tipp';
   var HIST_MAX = 40;
 
   /* ---------- kleine Helfer ---------- */
@@ -456,7 +511,8 @@
   /* ---------- Spracherkennung ---------- */
 
   var SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-  var recognition = null, listening = false, wantListening = false, startedAt = 0, tick = null;
+  var recognition = null, listening = false, wantListening = false,
+      startedAt = 0, tick = null, wachhund = null;
 
   if (!SR) {
     $('unsupported').hidden = false;
@@ -473,6 +529,7 @@
 
     r.onstart = function () {
       listening = true;
+      clearTimeout(wachhund);
       micBtn.classList.add('rec');
       micLabel.textContent = 'Diktat stoppen';
       setStatus('Ich höre zu …');
@@ -508,13 +565,19 @@
     };
 
     // Chrome beendet die Erkennung nach einer Pause von selbst — einfach neu starten.
+    // Safari auf dem iPhone lässt sich ohne neue Berührung oft nicht neu starten;
+    // dann geht es in den Pausenzustand und wartet auf einen Tipper.
     r.onend = function () {
       listening = false;
       interimEl.textContent = '';
       if (wantListening) {
         setTimeout(function () {
           if (wantListening && !listening) {
-            try { r.start(); } catch (err) { /* läuft bereits */ }
+            try { r.start(); } catch (err) { pausieren(); return; }
+            clearTimeout(wachhund);
+            wachhund = setTimeout(function () {
+              if (wantListening && !listening) { pausieren(); }
+            }, 1600);
           }
         }, 250);
       } else {
@@ -525,6 +588,17 @@
       }
     };
     return r;
+  }
+
+  /* Safari hat abgebrochen: Text sichern und auf einen Tipper warten. */
+  function pausieren() {
+    wantListening = false;
+    clearTimeout(wachhund);
+    stopTimer();
+    micBtn.classList.remove('rec');
+    micLabel.textContent = 'Weiter zuhören';
+    if ($('optHistory').checked) { keep(true); }
+    setStatus('Pausiert — zum Weiterhören tippen. Der Text bleibt erhalten.');
   }
 
   function start() {
@@ -544,6 +618,7 @@
   function stop() {
     var wasListening = wantListening;
     wantListening = false;
+    clearTimeout(wachhund);
     if (recognition) { try { recognition.stop(); } catch (err) {} }
     stopTimer();
     micBtn.classList.remove('rec');
@@ -677,13 +752,25 @@
   function fallbackCopy(text) {
     var ta = document.createElement('textarea');
     ta.value = text;
-    ta.setAttribute('readonly', '');
-    ta.style.position = 'fixed';
-    ta.style.left = '-9999px';
+    ta.contentEditable = 'true';
+    ta.readOnly = false;
+    // 16px verhindert, dass iOS beim Einblenden hineinzoomt
+    ta.style.cssText = 'position:fixed;top:0;left:0;width:1px;height:1px;opacity:0;font-size:16px';
     document.body.appendChild(ta);
-    ta.select();
     var ok = false;
-    try { ok = document.execCommand('copy'); } catch (e) {}
+    try {
+      if (IST_IOS) {
+        var bereich = document.createRange();
+        bereich.selectNodeContents(ta);
+        var auswahl = window.getSelection();
+        auswahl.removeAllRanges();
+        auswahl.addRange(bereich);
+        ta.setSelectionRange(0, 999999);
+      } else {
+        ta.select();
+      }
+      ok = document.execCommand('copy');
+    } catch (e) {}
     document.body.removeChild(ta);
     toast(ok ? 'Kopiert — mit Strg+V einfügen' : 'Browser blockt das Kopieren — bitte Strg+C');
     if (!ok) { textEl.focus(); textEl.select(); }
@@ -693,6 +780,17 @@
     var t = textEl.value;
     if (!t) { if (!silent) { toast('Noch nichts diktiert.'); } return; }
     writeClipboard(t, silent ? '' : 'Kopiert — mit Strg+V einfügen');
+  }
+
+  /* Teilen-Blatt des Systems: Claude, Notizen, Mail, Nachrichten … */
+  function teilen() {
+    var t = textEl.value.trim();
+    if (!t) { toast('Noch nichts diktiert.'); return; }
+    if (navigator.share) {
+      navigator.share({ text: t })['catch'](function () { /* abgebrochen */ });
+    } else {
+      copy(false);
+    }
   }
 
   /* Öffnet den Text als neue Unterhaltung in Claude. */
@@ -771,6 +869,7 @@
 
   $('clipMode').addEventListener('change', saveOpts);
   $('copyBtn').addEventListener('click', function () { copy(false); });
+  $('shareBtn').addEventListener('click', teilen);
   $('claudeBtn').addEventListener('click', toClaude);
   $('keepBtn').addEventListener('click', function () { keep(false); });
   $('histClearBtn').addEventListener('click', function () {
@@ -833,6 +932,15 @@
   });
 
   // Start
+  if (navigator.share) { $('shareBtn').hidden = false; }
+  if (IST_IOS && !ALS_APP && store(STORE_TIPP) !== 'zu') {
+    $('iosTipp').hidden = false;
+  }
+  $('iosTippZu').addEventListener('click', function () {
+    $('iosTipp').hidden = true;
+    store(STORE_TIPP, 'zu');
+  });
+
   loadOpts();
   renderCommands();
   loadHistory();
