@@ -1,7 +1,8 @@
 name: Pages
 
-# Veröffentlicht den Inhalt des Repositories als statische Seite.
-# `enablement: true` schaltet GitHub Pages beim ersten Lauf selbst ein.
+# Stellt GitHub Pages auf den Branch, der gerade gepusht wurde.
+# Das entspricht „Settings → Pages → Source: Deploy from a branch“,
+# nur ohne Klicken. Das Veröffentlichen übernimmt danach GitHub selbst.
 
 on:
   push:
@@ -13,32 +14,28 @@ on:
 permissions:
   contents: read
   pages: write
-  id-token: write
-
-concurrency:
-  group: pages
-  cancel-in-progress: false
 
 jobs:
-  deploy:
+  quelle-setzen:
     runs-on: ubuntu-latest
-    environment:
-      name: github-pages
-      url: ${{ steps.deploy.outputs.page_url }}
     steps:
-      - name: Repository auschecken
-        uses: actions/checkout@v4
+      - name: Pages auf diesen Branch stellen
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          BRANCH: ${{ github.ref_name }}
+          REPO: ${{ github.repository }}
+        run: |
+          set -u
+          echo "Gewünschte Quelle: $BRANCH (Wurzelverzeichnis)"
 
-      - name: Pages einrichten
-        uses: actions/configure-pages@v5
-        with:
-          enablement: true
+          if gh api --method POST "repos/$REPO/pages" \
+               -f "source[branch]=$BRANCH" -f "source[path]=/" >/dev/null 2>&1; then
+            echo "Pages war noch aus und ist jetzt eingerichtet."
+          else
+            echo "Pages läuft bereits — aktualisiere nur die Quelle."
+            gh api --method PUT "repos/$REPO/pages" \
+              -f "source[branch]=$BRANCH" -f "source[path]=/"
+          fi
 
-      - name: Dateien einpacken
-        uses: actions/upload-pages-artifact@v3
-        with:
-          path: .
-
-      - name: Veröffentlichen
-        id: deploy
-        uses: actions/deploy-pages@v4
+          gh api "repos/$REPO/pages" \
+            --jq '"Adresse: \(.html_url)\nStatus:  \(.status)\nQuelle:  \(.source.branch)\(.source.path)"'
