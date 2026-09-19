@@ -64,8 +64,18 @@ selbst. Die Seite fängt das ab, legt den Text im Verlauf ab und wartet mit
 an bleiben, sonst hört Safari auf zuzuhören.
 
 Damit die Seite aufs Telefon kommt, braucht sie eine Adresse. Am einfachsten über
-GitHub Pages (Repository → Settings → Pages → Branch wählen); danach liegt sie unter
-`https://<benutzername>.github.io/Dkk-Eur/diktat.html`.
+GitHub Pages — das muss einmal von Hand eingeschaltet werden, weil die Einstellung
+Administrationsrechte verlangt und weder ein Zugriffstoken noch ein Workflow sie setzen darf:
+
+1. Repository → **Settings** → **Pages**
+2. Unter *Build and deployment* bei **Source** „**Deploy from a branch**“ wählen
+3. Als Branch `main` wählen (oder den Arbeitsbranch, solange nichts zusammengeführt ist),
+   als Ordner `/ (root)`, dann **Save**
+
+Nach ein bis zwei Minuten liegt die Seite unter
+`https://<benutzername>.github.io/Dkk-Eur/diktat.html`. Die Datei `.nojekyll` im
+Wurzelverzeichnis sorgt dafür, dass GitHub die HTML-Dateien unverändert ausliefert.
+Ein Workflow wird dafür nicht gebraucht.
 
 ### Weg 2: Kurzbefehl — ein Tipp, und der Text ist fertig
 
