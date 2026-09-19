@@ -1,0 +1,17 @@
+# Abhängigkeiten für diktiergeraet.py (die Webseite diktat.html braucht nichts davon)
+
+# Aufnahme vom Mikrofon
+sounddevice>=0.4.6
+numpy>=1.24
+
+# Erkennung, lokal und offline — empfohlen
+faster-whisper>=1.0.0
+
+# Alternative Erkennung über Googles Web-Dienst (Internet nötig, kein Schlüssel)
+# SpeechRecognition>=3.10
+
+# Hotkey und Einfügen ins aktive Fenster
+pynput>=1.7.6
+
+# Zwischenablage (unter Linux zusätzlich xclip oder wl-clipboard installieren)
+pyperclip>=1.8.2

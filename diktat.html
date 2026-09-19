@@ -66,8 +66,9 @@
     width: 38px; height: 38px; flex: none;
     border-radius: 10px; border: 1px solid var(--border);
     background: var(--surface); color: var(--text-dim);
-    font-size: 1rem; cursor: pointer;
+    cursor: pointer; display: inline-flex; align-items: center; justify-content: center;
   }
+  .icon-btn svg { width: 17px; height: 17px; }
   .icon-btn:hover { color: var(--text); border-color: var(--text-dim); }
 
   .panel {
@@ -150,6 +151,28 @@
   .cmds code { background: var(--surface-2); padding: 1px 6px; border-radius: 5px; font-size: .85em; }
   .note { margin-top: 14px; font-size: .84rem; color: var(--text-dim); line-height: 1.6; }
 
+  .opt select { padding: 5px 8px; font-size: .85rem; border-radius: 8px; }
+
+  .hist { list-style: none; margin-top: 4px; }
+  .hist li {
+    display: flex; align-items: center; gap: 10px;
+    padding: 10px 0; border-bottom: 1px solid var(--border);
+  }
+  .hist li:last-child { border-bottom: none; }
+  .hist .when { font-size: .74rem; color: var(--text-dim); font-variant-numeric: tabular-nums; flex: none; width: 86px; }
+  .hist .prev {
+    flex: 1; min-width: 0; font-size: .88rem;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .hist .mini {
+    flex: none; border: 1px solid var(--border); background: var(--surface);
+    color: var(--text-dim); border-radius: 8px; padding: 5px 9px;
+    font: inherit; font-size: .78rem; cursor: pointer;
+  }
+  .hist .mini:hover { color: var(--text); border-color: var(--text-dim); }
+  .hist .mini.del:hover { color: var(--rec); border-color: var(--rec); }
+  .hist-empty { font-size: .85rem; color: var(--text-dim); padding: 6px 0; }
+
   .toast {
     position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%) translateY(12px);
     background: var(--text); color: var(--bg);
@@ -175,7 +198,12 @@
       <h1>Diktat</h1>
       <span class="sub">Sprechen → automatisch verschriftlichen, formatieren und sichern</span>
     </div>
-    <button class="icon-btn" id="themeBtn" title="Hell / Dunkel umschalten" aria-label="Hell / Dunkel umschalten">◐</button>
+    <button class="icon-btn" id="themeBtn" title="Hell / Dunkel umschalten" aria-label="Hell / Dunkel umschalten">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+        <circle cx="12" cy="12" r="9" />
+        <path d="M12 3a9 9 0 0 0 0 18z" fill="currentColor" stroke="none" />
+      </svg>
+    </button>
   </header>
 
   <div id="unsupported" class="banner" hidden>
@@ -207,7 +235,14 @@
       <label class="opt"><input type="checkbox" id="optCommands" checked> Satzzeichen-Befehle</label>
       <label class="opt"><input type="checkbox" id="optFiller" checked> Füllwörter entfernen</label>
       <label class="opt"><input type="checkbox" id="optSave" checked> Automatisch speichern</label>
-      <label class="opt"><input type="checkbox" id="optClip"> Automatisch in Zwischenablage</label>
+      <label class="opt"><input type="checkbox" id="optHistory" checked> Im Verlauf ablegen</label>
+      <label class="opt" for="clipMode">In die Zwischenablage
+        <select id="clipMode" title="Wann der Text automatisch kopiert wird">
+          <option value="stopp" selected>beim Stoppen</option>
+          <option value="satz">nach jedem Satz</option>
+          <option value="nie">nie</option>
+        </select>
+      </label>
     </div>
   </section>
 
@@ -221,11 +256,22 @@
 
     <div class="actions">
       <button class="btn primary" id="copyBtn">Kopieren</button>
+      <button class="btn" id="claudeBtn">In Claude öffnen</button>
+      <button class="btn" id="keepBtn">Im Verlauf ablegen</button>
       <button class="btn" id="txtBtn">Als .txt</button>
       <button class="btn" id="mdBtn">Als .md</button>
       <button class="btn" id="undoBtn">Letzten Satz zurück</button>
       <button class="btn danger" id="clearBtn">Leeren</button>
     </div>
+  </section>
+
+  <section class="panel">
+    <div class="editor-head">
+      <h2>Verlauf</h2>
+      <button class="btn" id="histClearBtn" style="padding:4px 10px;font-size:.78rem">Alle löschen</button>
+    </div>
+    <ul class="hist" id="hist"></ul>
+    <p class="hist-empty" id="histEmpty">Noch nichts abgelegt. Jedes beendete Diktat landet hier — zum späteren Einfügen.</p>
   </section>
 
   <section class="panel">
@@ -236,6 +282,11 @@
         Tastenkürzel: <code>Strg</code>+<code>M</code> startet und stoppt das Diktat, <code>Esc</code> stoppt es.
         Der Text wird bei „Automatisch speichern“ laufend im Browser abgelegt und beim nächsten Öffnen wiederhergestellt —
         er verlässt dabei dieses Gerät nicht.
+        <br><br>
+        Zum Weiterverwenden: Beim Stoppen landet das Diktat automatisch in der Zwischenablage und im Verlauf.
+        Danach genügt <code>Strg</code>+<code>V</code> im Zielprogramm — oder „In Claude öffnen“ für eine neue Unterhaltung.
+        Soll der Text von selbst ins gerade aktive Fenster geschrieben werden, ohne Einfügen von Hand,
+        leistet das <code>diktiergeraet.py</code> aus diesem Verzeichnis.
       </p>
     </details>
   </section>
@@ -251,7 +302,9 @@
   var textEl = $('text'), interimEl = $('interim'), statusEl = $('status'),
       micBtn = $('micBtn'), micLabel = $('micLabel'), timerEl = $('timer'), countEl = $('count');
 
-  var STORE_TEXT = 'diktat.text', STORE_OPTS = 'diktat.opts', STORE_THEME = 'diktat.theme';
+  var STORE_TEXT = 'diktat.text', STORE_OPTS = 'diktat.opts',
+      STORE_THEME = 'diktat.theme', STORE_HIST = 'diktat.verlauf';
+  var HIST_MAX = 40;
 
   /* ---------- kleine Helfer ---------- */
 
@@ -390,7 +443,7 @@
     textEl.value = next;
     textEl.scrollTop = textEl.scrollHeight;
     afterChange();
-    if ($('optClip').checked) { copy(true); }
+    if ($('clipMode').value === 'satz') { copy(true); }
   }
 
   function afterChange() {
@@ -489,11 +542,20 @@
   }
 
   function stop() {
+    var wasListening = wantListening;
     wantListening = false;
     if (recognition) { try { recognition.stop(); } catch (err) {} }
     stopTimer();
     micBtn.classList.remove('rec');
     micLabel.textContent = 'Diktat starten';
+    if (!wasListening) { return; }
+
+    // Das Diktat ist fertig — hier wird es abholbereit gemacht.
+    if ($('optHistory').checked) { keep(true); }
+    if ($('clipMode').value === 'stopp' && textEl.value.trim()) {
+      copy(true);
+      setStatus('Fertig — kopiert, mit Strg+V einfügen.');
+    }
   }
 
   function startTimer() {
@@ -506,21 +568,143 @@
   }
   function stopTimer() { clearInterval(tick); }
 
+  /* ---------- Verlauf: abgelegte Diktate für später ---------- */
+
+  var history = [];
+
+  function loadHistory() {
+    try { history = JSON.parse(store(STORE_HIST) || '[]'); } catch (e) { history = []; }
+    if (!Array.isArray(history)) { history = []; }
+  }
+
+  function saveHistory() {
+    try { store(STORE_HIST, JSON.stringify(history)); } catch (e) {}
+  }
+
+  /* Legt den aktuellen Text ab. silent = automatisch beim Stoppen. */
+  function keep(silent) {
+    var t = textEl.value.trim();
+    if (!t) { if (!silent) { toast('Noch nichts diktiert.'); } return; }
+    if (history.length && history[0].text === t) {
+      if (!silent) { toast('Steht schon im Verlauf'); }
+      return;
+    }
+    history.unshift({ t: Date.now(), text: t });
+    history = history.slice(0, HIST_MAX);
+    saveHistory();
+    renderHistory();
+    if (!silent) { toast('Im Verlauf abgelegt'); }
+  }
+
+  function stamp(ms) {
+    var d = new Date(ms), now = new Date();
+    var time = String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0');
+    var sameDay = d.toDateString() === now.toDateString();
+    return sameDay ? time : String(d.getDate()).padStart(2, '0') + '.' +
+      String(d.getMonth() + 1).padStart(2, '0') + '. ' + time;
+  }
+
+  function renderHistory() {
+    var ul = $('hist');
+    $('histEmpty').hidden = history.length > 0;
+    $('histClearBtn').hidden = history.length === 0;
+    ul.innerHTML = '';
+    history.forEach(function (item, idx) {
+      var li = document.createElement('li');
+
+      var when = document.createElement('span');
+      when.className = 'when';
+      when.textContent = stamp(item.t);
+
+      var prev = document.createElement('span');
+      prev.className = 'prev';
+      prev.textContent = item.text.replace(/\s+/g, ' ');
+      prev.title = item.text;
+
+      li.appendChild(when);
+      li.appendChild(prev);
+      [['Kopieren', 'copy'], ['Einfügen', 'use'], ['✕', 'del']].forEach(function (pair) {
+        var b = document.createElement('button');
+        b.className = 'mini' + (pair[1] === 'del' ? ' del' : '');
+        b.textContent = pair[0];
+        b.dataset.act = pair[1];
+        b.dataset.idx = idx;
+        if (pair[1] === 'del') { b.title = 'Aus dem Verlauf entfernen'; }
+        if (pair[1] === 'use') { b.title = 'An den Text im Editor anhängen'; }
+        li.appendChild(b);
+      });
+      ul.appendChild(li);
+    });
+  }
+
+  $('hist').addEventListener('click', function (e) {
+    var b = e.target.closest('button.mini');
+    if (!b) { return; }
+    var item = history[Number(b.dataset.idx)];
+    if (!item) { return; }
+
+    if (b.dataset.act === 'copy') {
+      writeClipboard(item.text, 'Kopiert — mit Strg+V einfügen');
+    } else if (b.dataset.act === 'use') {
+      var before = textEl.value;
+      textEl.value = before ? before.replace(/\s*$/, '') + '\n\n' + item.text : item.text;
+      lastInsert = null;
+      afterChange();
+      toast('In den Editor übernommen');
+    } else {
+      history.splice(Number(b.dataset.idx), 1);
+      saveHistory();
+      renderHistory();
+    }
+  });
+
   /* ---------- Ausgabe ---------- */
+
+  /* Schreibt in die Zwischenablage; scheitert das, bleibt der Weg über Strg+C. */
+  function writeClipboard(text, okMsg) {
+    if (!text) { return; }
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(function () {
+        if (okMsg) { toast(okMsg); }
+      })['catch'](function () {
+        fallbackCopy(text);
+      });
+    } else {
+      fallbackCopy(text);
+    }
+  }
+
+  function fallbackCopy(text) {
+    var ta = document.createElement('textarea');
+    ta.value = text;
+    ta.setAttribute('readonly', '');
+    ta.style.position = 'fixed';
+    ta.style.left = '-9999px';
+    document.body.appendChild(ta);
+    ta.select();
+    var ok = false;
+    try { ok = document.execCommand('copy'); } catch (e) {}
+    document.body.removeChild(ta);
+    toast(ok ? 'Kopiert — mit Strg+V einfügen' : 'Browser blockt das Kopieren — bitte Strg+C');
+    if (!ok) { textEl.focus(); textEl.select(); }
+  }
 
   function copy(silent) {
     var t = textEl.value;
     if (!t) { if (!silent) { toast('Noch nichts diktiert.'); } return; }
-    if (navigator.clipboard && navigator.clipboard.writeText) {
-      navigator.clipboard.writeText(t).then(function () {
-        if (!silent) { toast('In die Zwischenablage kopiert'); }
-      })['catch'](function () {
-        if (!silent) { toast('Kopieren wurde vom Browser abgelehnt'); }
-      });
-    } else if (!silent) {
-      textEl.select();
-      toast('Bitte mit Strg+C kopieren');
+    writeClipboard(t, silent ? '' : 'Kopiert — mit Strg+V einfügen');
+  }
+
+  /* Öffnet den Text als neue Unterhaltung in Claude. */
+  function toClaude() {
+    var t = textEl.value.trim();
+    if (!t) { toast('Noch nichts diktiert.'); return; }
+    if (t.length > 6000) {
+      copy(false);
+      toast('Für den Link zu lang — Text ist kopiert, bitte in Claude einfügen');
+      return;
     }
+    window.open('https://claude.ai/new?q=' + encodeURIComponent(t), '_blank', 'noopener');
   }
 
   function download(ext, mime) {
@@ -546,12 +730,13 @@
 
   /* ---------- Einstellungen merken ---------- */
 
-  var OPT_IDS = ['optFormat', 'optCommands', 'optFiller', 'optSave', 'optClip'];
+  var OPT_IDS = ['optFormat', 'optCommands', 'optFiller', 'optSave', 'optHistory'];
 
   function saveOpts() {
     var o = {};
     OPT_IDS.forEach(function (id) { o[id] = $(id).checked; });
     o.lang = $('lang').value;
+    o.clipMode = $('clipMode').value;
     store(STORE_OPTS, JSON.stringify(o));
   }
 
@@ -562,6 +747,7 @@
       var o = JSON.parse(raw);
       OPT_IDS.forEach(function (id) { if (typeof o[id] === 'boolean') { $(id).checked = o[id]; } });
       if (o.lang) { $('lang').value = o.lang; }
+      if (o.clipMode) { $('clipMode').value = o.clipMode; }
     } catch (e) {}
   }
 
@@ -583,7 +769,17 @@
 
   textEl.addEventListener('input', afterChange);
 
+  $('clipMode').addEventListener('change', saveOpts);
   $('copyBtn').addEventListener('click', function () { copy(false); });
+  $('claudeBtn').addEventListener('click', toClaude);
+  $('keepBtn').addEventListener('click', function () { keep(false); });
+  $('histClearBtn').addEventListener('click', function () {
+    if (history.length && confirm('Den gesamten Verlauf löschen?')) {
+      history = [];
+      saveHistory();
+      renderHistory();
+    }
+  });
   $('txtBtn').addEventListener('click', function () { download('txt', 'text/plain'); });
   $('mdBtn').addEventListener('click', function () { download('md', 'text/markdown'); });
 
@@ -639,6 +835,8 @@
   // Start
   loadOpts();
   renderCommands();
+  loadHistory();
+  renderHistory();
   var restored = $('optSave').checked ? store(STORE_TEXT) : null;
   if (restored) {
     textEl.value = restored;
