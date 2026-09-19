@@ -1,0 +1,44 @@
+name: Pages
+
+# Veröffentlicht den Inhalt des Repositories als statische Seite.
+# `enablement: true` schaltet GitHub Pages beim ersten Lauf selbst ein.
+
+on:
+  push:
+    branches:
+      - main
+      - claude/dictation-program-automation-vms7dj
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - name: Repository auschecken
+        uses: actions/checkout@v4
+
+      - name: Pages einrichten
+        uses: actions/configure-pages@v5
+        with:
+          enablement: true
+
+      - name: Dateien einpacken
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: .
+
+      - name: Veröffentlichen
+        id: deploy
+        uses: actions/deploy-pages@v4
