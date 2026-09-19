@@ -63,19 +63,24 @@ selbst. Die Seite fängt das ab, legt den Text im Verlauf ab und wartet mit
 „Weiter zuhören“ auf einen Tipper — nichts geht verloren. Und der Bildschirm sollte
 an bleiben, sonst hört Safari auf zuzuhören.
 
-Damit die Seite aufs Telefon kommt, braucht sie eine Adresse. Am einfachsten über
-GitHub Pages — das muss einmal von Hand eingeschaltet werden, weil die Einstellung
-Administrationsrechte verlangt und weder ein Zugriffstoken noch ein Workflow sie setzen darf:
+Damit die Seite aufs Telefon kommt, braucht sie eine Adresse. Für dieses Repository
+ist GitHub Pages bereits eingeschaltet — ausgeliefert wird aber immer nur **ein**
+Branch, und der muss auf den zeigen, der `diktat.html` enthält:
 
 1. Repository → **Settings** → **Pages**
-2. Unter *Build and deployment* bei **Source** „**Deploy from a branch**“ wählen
-3. Als Branch `main` wählen (oder den Arbeitsbranch, solange nichts zusammengeführt ist),
-   als Ordner `/ (root)`, dann **Save**
+2. Unter *Build and deployment* bei **Source**: „**Deploy from a branch**“
+3. Branch auswählen (`main`, sobald die Dateien dort liegen — sonst den Arbeitsbranch),
+   Ordner `/ (root)`, dann **Save**
 
-Nach ein bis zwei Minuten liegt die Seite unter
-`https://<benutzername>.github.io/Dkk-Eur/diktat.html`. Die Datei `.nojekyll` im
-Wurzelverzeichnis sorgt dafür, dass GitHub die HTML-Dateien unverändert ausliefert.
-Ein Workflow wird dafür nicht gebraucht.
+Diesen Schalter kann nur jemand mit Administrationsrechten am Repository umlegen;
+ein Zugriffstoken oder ein Workflow bekommt dafür `403 Resource not accessible by
+integration`, selbst mit der Berechtigung `pages: write`. Die deckt nur
+Pages-*Deployments* ab, nicht die Pages-*Einstellung*.
+
+Ein bis zwei Minuten nach dem Speichern liegt die Seite unter
+`https://<benutzername>.github.io/Dkk-Eur/diktat.html`. Ob der Bau geklappt hat, zeigt
+der Lauf „pages build and deployment“ unter *Actions*. Die Datei `.nojekyll` im
+Wurzelverzeichnis sorgt dafür, dass die HTML-Dateien unverändert ausgeliefert werden.
 
 ### Weg 2: Kurzbefehl — ein Tipp, und der Text ist fertig
 
