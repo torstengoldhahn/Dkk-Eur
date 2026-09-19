@@ -1,0 +1,651 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Diktat</title>
+<style>
+  :root {
+    --bg: #f4f5f9;
+    --surface: #ffffff;
+    --surface-2: #f0f1f6;
+    --border: #dcdee7;
+    --text: #1b1c22;
+    --text-dim: #6a6d7d;
+    --accent: #4f46e5;
+    --accent-soft: #eceafc;
+    --rec: #d92d20;
+    --ok: #15803d;
+    --shadow: 0 1px 2px rgba(20,22,40,.06), 0 8px 24px rgba(20,22,40,.07);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #101117;
+      --surface: #191b23;
+      --surface-2: #21242e;
+      --border: #313543;
+      --text: #ecedf2;
+      --text-dim: #9599a8;
+      --accent: #8b85f5;
+      --accent-soft: #24243a;
+      --rec: #f0685c;
+      --ok: #4ade80;
+      --shadow: 0 1px 2px rgba(0,0,0,.4), 0 8px 24px rgba(0,0,0,.35);
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #101117;
+    --surface: #191b23;
+    --surface-2: #21242e;
+    --border: #313543;
+    --text: #ecedf2;
+    --text-dim: #9599a8;
+    --accent: #8b85f5;
+    --accent-soft: #24243a;
+    --rec: #f0685c;
+    --ok: #4ade80;
+    --shadow: 0 1px 2px rgba(0,0,0,.4), 0 8px 24px rgba(0,0,0,.35);
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { background: var(--bg); }
+  body {
+    min-height: 100vh;
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    font-size: 15px;
+    line-height: 1.5;
+    padding: 24px 16px 48px;
+  }
+  .wrap { max-width: 780px; margin: 0 auto; }
+
+  header { display: flex; align-items: center; gap: 12px; margin-bottom: 20px; }
+  header h1 { font-size: 1.25rem; font-weight: 700; letter-spacing: -.01em; flex: 1; }
+  header .sub { display: block; font-size: .78rem; font-weight: 500; color: var(--text-dim); margin-top: 2px; }
+  .icon-btn {
+    width: 38px; height: 38px; flex: none;
+    border-radius: 10px; border: 1px solid var(--border);
+    background: var(--surface); color: var(--text-dim);
+    font-size: 1rem; cursor: pointer;
+  }
+  .icon-btn:hover { color: var(--text); border-color: var(--text-dim); }
+
+  .panel {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    box-shadow: var(--shadow);
+    padding: 18px;
+    margin-bottom: 16px;
+  }
+
+  .controls { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+  .mic {
+    display: inline-flex; align-items: center; gap: 10px;
+    padding: 13px 22px;
+    border: none; border-radius: 999px;
+    background: var(--accent); color: #fff;
+    font: inherit; font-weight: 650; font-size: .95rem;
+    cursor: pointer;
+  }
+  .mic:disabled { opacity: .45; cursor: not-allowed; }
+  .mic.rec { background: var(--rec); }
+  .mic .dot { width: 9px; height: 9px; border-radius: 50%; background: currentColor; opacity: .85; }
+  .mic.rec .dot { animation: pulse 1.2s ease-in-out infinite; }
+  @keyframes pulse { 0%,100% { opacity: 1; transform: scale(1); } 50% { opacity: .25; transform: scale(.7); } }
+  @media (prefers-reduced-motion: reduce) { .mic.rec .dot { animation: none; } }
+
+  .status { font-size: .85rem; color: var(--text-dim); flex: 1; min-width: 140px; }
+  .status.err { color: var(--rec); }
+  .timer { font-variant-numeric: tabular-nums; font-size: .9rem; font-weight: 600; color: var(--text-dim); }
+
+  select, .opt-row label { font: inherit; }
+  select {
+    padding: 9px 12px; border-radius: 10px;
+    border: 1px solid var(--border);
+    background: var(--surface-2); color: var(--text);
+    font-size: .88rem; cursor: pointer;
+  }
+
+  .opts { display: flex; flex-wrap: wrap; gap: 8px 20px; margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--border); }
+  .opt { display: inline-flex; align-items: center; gap: 7px; font-size: .85rem; color: var(--text-dim); cursor: pointer; }
+  .opt input { accent-color: var(--accent); width: 15px; height: 15px; cursor: pointer; }
+  .opt:hover { color: var(--text); }
+
+  .editor-head { display: flex; align-items: baseline; gap: 10px; margin-bottom: 10px; }
+  .editor-head h2 { font-size: .78rem; text-transform: uppercase; letter-spacing: .07em; color: var(--text-dim); font-weight: 700; flex: 1; }
+  .count { font-size: .78rem; color: var(--text-dim); font-variant-numeric: tabular-nums; }
+
+  textarea {
+    width: 100%; min-height: 260px; resize: vertical;
+    border: 1px solid var(--border); border-radius: 12px;
+    background: var(--surface-2); color: var(--text);
+    padding: 14px 16px;
+    font-family: ui-serif, Georgia, 'Times New Roman', serif;
+    font-size: 1.02rem; line-height: 1.7;
+  }
+  textarea:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
+  .interim {
+    margin-top: 8px; min-height: 22px;
+    font-size: .92rem; color: var(--text-dim); font-style: italic;
+  }
+
+  .actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
+  .btn {
+    padding: 9px 15px; border-radius: 10px;
+    border: 1px solid var(--border); background: var(--surface);
+    color: var(--text); font: inherit; font-size: .87rem; font-weight: 550;
+    cursor: pointer;
+  }
+  .btn:hover { background: var(--surface-2); }
+  .btn.primary { background: var(--accent-soft); border-color: transparent; color: var(--accent); }
+  .btn.danger:hover { border-color: var(--rec); color: var(--rec); }
+
+  details.help { font-size: .87rem; }
+  details.help summary { cursor: pointer; font-weight: 600; color: var(--text-dim); }
+  details.help summary:hover { color: var(--text); }
+  .cmds { display: grid; grid-template-columns: repeat(auto-fill, minmax(215px, 1fr)); gap: 6px 18px; margin-top: 14px; }
+  .cmds div { display: flex; justify-content: space-between; gap: 10px; padding: 5px 0; border-bottom: 1px dashed var(--border); color: var(--text-dim); }
+  .cmds b { color: var(--text); font-weight: 600; }
+  .cmds code { background: var(--surface-2); padding: 1px 6px; border-radius: 5px; font-size: .85em; }
+  .note { margin-top: 14px; font-size: .84rem; color: var(--text-dim); line-height: 1.6; }
+
+  .toast {
+    position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%) translateY(12px);
+    background: var(--text); color: var(--bg);
+    padding: 10px 18px; border-radius: 999px;
+    font-size: .87rem; font-weight: 600;
+    opacity: 0; pointer-events: none; transition: opacity .18s, transform .18s;
+  }
+  .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+  .banner {
+    background: var(--accent-soft); color: var(--text);
+    border: 1px solid var(--border); border-radius: 12px;
+    padding: 14px 16px; margin-bottom: 16px; font-size: .88rem; line-height: 1.6;
+  }
+  .banner b { color: var(--rec); }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <div style="flex:1">
+      <h1>Diktat</h1>
+      <span class="sub">Sprechen → automatisch verschriftlichen, formatieren und sichern</span>
+    </div>
+    <button class="icon-btn" id="themeBtn" title="Hell / Dunkel umschalten" aria-label="Hell / Dunkel umschalten">◐</button>
+  </header>
+
+  <div id="unsupported" class="banner" hidden>
+    <b>Dieser Browser kann nicht zuhören.</b><br>
+    Die Spracherkennung (Web Speech API) läuft derzeit in <b>Chrome</b>, <b>Edge</b> und <b>Safari</b>.
+    In Firefox ist sie nicht verfügbar. Der Texteditor unten funktioniert trotzdem.
+  </div>
+
+  <section class="panel">
+    <div class="controls">
+      <button class="mic" id="micBtn"><span class="dot"></span><span id="micLabel">Diktat starten</span></button>
+      <span class="timer" id="timer">00:00</span>
+      <span class="status" id="status">Bereit.</span>
+      <select id="lang" title="Diktiersprache">
+        <option value="de-DE" selected>Deutsch (DE)</option>
+        <option value="de-AT">Deutsch (AT)</option>
+        <option value="de-CH">Deutsch (CH)</option>
+        <option value="en-US">English (US)</option>
+        <option value="en-GB">English (UK)</option>
+        <option value="fr-FR">Français</option>
+        <option value="es-ES">Español</option>
+        <option value="it-IT">Italiano</option>
+        <option value="da-DK">Dansk</option>
+      </select>
+    </div>
+
+    <div class="opts">
+      <label class="opt"><input type="checkbox" id="optFormat" checked> Automatisch formatieren</label>
+      <label class="opt"><input type="checkbox" id="optCommands" checked> Satzzeichen-Befehle</label>
+      <label class="opt"><input type="checkbox" id="optFiller" checked> Füllwörter entfernen</label>
+      <label class="opt"><input type="checkbox" id="optSave" checked> Automatisch speichern</label>
+      <label class="opt"><input type="checkbox" id="optClip"> Automatisch in Zwischenablage</label>
+    </div>
+  </section>
+
+  <section class="panel">
+    <div class="editor-head">
+      <h2>Diktiertes</h2>
+      <span class="count" id="count">0 Wörter · 0 Zeichen</span>
+    </div>
+    <textarea id="text" placeholder="Hier erscheint das Diktierte. Du kannst jederzeit auch direkt hineinschreiben."></textarea>
+    <div class="interim" id="interim"></div>
+
+    <div class="actions">
+      <button class="btn primary" id="copyBtn">Kopieren</button>
+      <button class="btn" id="txtBtn">Als .txt</button>
+      <button class="btn" id="mdBtn">Als .md</button>
+      <button class="btn" id="undoBtn">Letzten Satz zurück</button>
+      <button class="btn danger" id="clearBtn">Leeren</button>
+    </div>
+  </section>
+
+  <section class="panel">
+    <details class="help">
+      <summary>Sprachbefehle &amp; Tastenkürzel</summary>
+      <div class="cmds" id="cmdList"></div>
+      <p class="note">
+        Tastenkürzel: <code>Strg</code>+<code>M</code> startet und stoppt das Diktat, <code>Esc</code> stoppt es.
+        Der Text wird bei „Automatisch speichern“ laufend im Browser abgelegt und beim nächsten Öffnen wiederhergestellt —
+        er verlässt dabei dieses Gerät nicht.
+      </p>
+    </details>
+  </section>
+
+</div>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<script>
+(function () {
+  'use strict';
+
+  var $ = function (id) { return document.getElementById(id); };
+  var textEl = $('text'), interimEl = $('interim'), statusEl = $('status'),
+      micBtn = $('micBtn'), micLabel = $('micLabel'), timerEl = $('timer'), countEl = $('count');
+
+  var STORE_TEXT = 'diktat.text', STORE_OPTS = 'diktat.opts', STORE_THEME = 'diktat.theme';
+
+  /* ---------- kleine Helfer ---------- */
+
+  function store(key, value) {
+    try {
+      if (value === undefined) { var v = localStorage.getItem(key); return v; }
+      localStorage.setItem(key, value);
+    } catch (e) { /* privates Fenster o. ä. — kein Problem */ }
+    return null;
+  }
+
+  var toastTimer;
+  function toast(msg) {
+    var t = $('toast');
+    t.textContent = msg;
+    t.classList.add('show');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(function () { t.classList.remove('show'); }, 1900);
+  }
+
+  function setStatus(msg, isError) {
+    statusEl.textContent = msg;
+    statusEl.classList.toggle('err', !!isError);
+  }
+
+  /* ---------- Sprachbefehle und Füllwörter ---------- */
+
+  var COMMANDS = {
+    'de': {
+      'punkt': '.', 'komma': ',', 'fragezeichen': '?', 'ausrufezeichen': '!',
+      'doppelpunkt': ':', 'semikolon': ';', 'strichpunkt': ';',
+      'bindestrich': '-', 'gedankenstrich': '–', 'schrägstrich': '/',
+      'klammer auf': '(', 'klammer zu': ')',
+      'anführungszeichen auf': '„', 'anführungszeichen zu': '“',
+      'neue zeile': '\n', 'neuer absatz': '\n\n', 'absatz': '\n\n'
+    },
+    'en': {
+      'period': '.', 'full stop': '.', 'comma': ',', 'question mark': '?',
+      'exclamation mark': '!', 'colon': ':', 'semicolon': ';',
+      'hyphen': '-', 'dash': '–', 'slash': '/',
+      'open bracket': '(', 'close bracket': ')',
+      'open quote': '“', 'close quote': '”',
+      'new line': '\n', 'new paragraph': '\n\n'
+    }
+  };
+
+  var FILLERS = {
+    'de': ['ähm', 'ähmm', 'äh', 'ah', 'öh', 'öhm', 'ehm', 'em', 'hm', 'hmm', 'mhm', 'mmh', 'tja'],
+    'en': ['um', 'umm', 'uh', 'uhh', 'erm', 'er', 'hmm', 'mhm']
+  };
+
+  function dialect() {
+    var l = $('lang').value.slice(0, 2);
+    return COMMANDS[l] ? l : 'en';
+  }
+
+  /* Baut die Befehlsliste in der Hilfe auf. */
+  function renderCommands() {
+    var map = COMMANDS[dialect()], list = $('cmdList'), html = '';
+    var pretty = { '\n': '↵ Zeilenumbruch', '\n\n': '¶ Neuer Absatz' };
+    Object.keys(map).forEach(function (word) {
+      var out = map[word];
+      html += '<div><b>' + word + '</b><code>' + (pretty[out] || out) + '</code></div>';
+    });
+    list.innerHTML = html;
+  }
+
+  /* ---------- Textverarbeitung ---------- */
+
+  /* Ersetzt gesprochene Satzzeichen und streicht Füllwörter. */
+  function applySpokenRules(raw) {
+    var lang = dialect(),
+        map = COMMANDS[lang],
+        fillers = FILLERS[lang] || [],
+        useCmds = $('optCommands').checked,
+        useFiller = $('optFiller').checked,
+        words = raw.split(/\s+/).filter(Boolean),
+        out = [],
+        i = 0;
+
+    while (i < words.length) {
+      var clean = words[i].toLowerCase().replace(/[.,!?;:]+$/, '');
+
+      // Zwei-Wort-Befehle zuerst ("klammer auf", "neuer absatz")
+      if (useCmds && i + 1 < words.length) {
+        var pair = clean + ' ' + words[i + 1].toLowerCase().replace(/[.,!?;:]+$/, '');
+        if (i + 2 < words.length && map[pair + ' ' + words[i + 2].toLowerCase().replace(/[.,!?;:]+$/, '')]) {
+          out.push(map[pair + ' ' + words[i + 2].toLowerCase().replace(/[.,!?;:]+$/, '')]);
+          i += 3; continue;
+        }
+        if (map[pair]) { out.push(map[pair]); i += 2; continue; }
+      }
+      if (useCmds && map[clean]) { out.push(map[clean]); i += 1; continue; }
+      if (useFiller && fillers.indexOf(clean) !== -1) { i += 1; continue; }
+
+      out.push(words[i]);
+      i += 1;
+    }
+    return out.join(' ');
+  }
+
+  /* Setzt Abstände und Großschreibung am Satzanfang gerade. */
+  function tidy(text) {
+    return text
+      .replace(/[ \t]+/g, ' ')                       // Mehrfach-Leerzeichen
+      .replace(/ *\n */g, '\n')                      // Leerzeichen um Umbrüche
+      .replace(/\n{3,}/g, '\n\n')                    // höchstens eine Leerzeile
+      .replace(/\s+([,.;:!?…])/g, '$1')              // kein Abstand vor Satzzeichen
+      .replace(/([,;:])(?=[^\s\n])/g, '$1 ')         // ein Abstand danach
+      .replace(/(.)([.!?])(?=[A-Za-zÄÖÜäöüß0-9])/g, function (m, prev, mark, offset, whole) {
+        var next = whole.charAt(offset + m.length);
+        // "3.5" oder "12.03." nicht auseinanderreißen
+        if (/\d/.test(prev) && /\d/.test(next)) { return prev + mark; }
+        return prev + mark + ' ';
+      })
+      .replace(/([(„])\s+/g, '$1')                   // kein Abstand nach öffnender Klammer
+      .replace(/\s+([)“])/g, '$1')
+      .replace(/(^|[.!?]\s+|\n\s*)([a-zäöüß])/g, function (m, before, ch) {
+        return before + ch.toUpperCase();            // Satzanfang groß
+      })
+      .replace(/[ \t]+$/gm, '');                     // Leerzeichen am Zeilenende
+  }
+
+  var lastInsert = null;   // für „Letzten Satz zurück“
+
+  function insert(chunk) {
+    if (!chunk) { return; }
+    var before = textEl.value;
+    var glue = '';
+    if (before && !/\s$/.test(before) && !/^[\n.,;:!?]/.test(chunk)) { glue = ' '; }
+
+    var next = before + glue + chunk;
+    if ($('optFormat').checked) { next = tidy(next); }
+
+    lastInsert = { before: before, after: next };
+    textEl.value = next;
+    textEl.scrollTop = textEl.scrollHeight;
+    afterChange();
+    if ($('optClip').checked) { copy(true); }
+  }
+
+  function afterChange() {
+    var t = textEl.value;
+    var words = t.trim() ? t.trim().split(/\s+/).length : 0;
+    countEl.textContent = words + (words === 1 ? ' Wort · ' : ' Wörter · ') + t.length + ' Zeichen';
+    if ($('optSave').checked) { store(STORE_TEXT, t); }
+  }
+
+  /* ---------- Spracherkennung ---------- */
+
+  var SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  var recognition = null, listening = false, wantListening = false, startedAt = 0, tick = null;
+
+  if (!SR) {
+    $('unsupported').hidden = false;
+    micBtn.disabled = true;
+    setStatus('Spracherkennung in diesem Browser nicht verfügbar.', true);
+  }
+
+  function buildRecognition() {
+    var r = new SR();
+    r.lang = $('lang').value;
+    r.continuous = true;
+    r.interimResults = true;
+    r.maxAlternatives = 1;
+
+    r.onstart = function () {
+      listening = true;
+      micBtn.classList.add('rec');
+      micLabel.textContent = 'Diktat stoppen';
+      setStatus('Ich höre zu …');
+    };
+
+    r.onresult = function (event) {
+      var interim = '';
+      for (var i = event.resultIndex; i < event.results.length; i++) {
+        var res = event.results[i];
+        var said = res[0].transcript;
+        if (res.isFinal) {
+          insert(applySpokenRules(said.trim()));
+        } else {
+          interim += said;
+        }
+      }
+      interimEl.textContent = interim ? interim + ' …' : '';
+    };
+
+    r.onerror = function (event) {
+      var e = event.error;
+      if (e === 'not-allowed' || e === 'service-not-allowed') {
+        wantListening = false;
+        setStatus('Kein Zugriff aufs Mikrofon — bitte in den Browser-Einstellungen erlauben.', true);
+      } else if (e === 'no-speech') {
+        setStatus('Nichts gehört — ich höre weiter zu.');
+      } else if (e === 'audio-capture') {
+        wantListening = false;
+        setStatus('Kein Mikrofon gefunden.', true);
+      } else if (e !== 'aborted') {
+        setStatus('Fehler bei der Erkennung: ' + e, true);
+      }
+    };
+
+    // Chrome beendet die Erkennung nach einer Pause von selbst — einfach neu starten.
+    r.onend = function () {
+      listening = false;
+      interimEl.textContent = '';
+      if (wantListening) {
+        setTimeout(function () {
+          if (wantListening && !listening) {
+            try { r.start(); } catch (err) { /* läuft bereits */ }
+          }
+        }, 250);
+      } else {
+        micBtn.classList.remove('rec');
+        micLabel.textContent = 'Diktat starten';
+        setStatus('Gestoppt.');
+        stopTimer();
+      }
+    };
+    return r;
+  }
+
+  function start() {
+    if (!SR || wantListening) { return; }
+    recognition = buildRecognition();
+    wantListening = true;
+    try {
+      recognition.start();
+    } catch (err) {
+      wantListening = false;
+      setStatus('Start nicht möglich: ' + err.message, true);
+      return;
+    }
+    startTimer();
+  }
+
+  function stop() {
+    wantListening = false;
+    if (recognition) { try { recognition.stop(); } catch (err) {} }
+    stopTimer();
+    micBtn.classList.remove('rec');
+    micLabel.textContent = 'Diktat starten';
+  }
+
+  function startTimer() {
+    startedAt = Date.now();
+    clearInterval(tick);
+    tick = setInterval(function () {
+      var s = Math.floor((Date.now() - startedAt) / 1000);
+      timerEl.textContent = String(Math.floor(s / 60)).padStart(2, '0') + ':' + String(s % 60).padStart(2, '0');
+    }, 500);
+  }
+  function stopTimer() { clearInterval(tick); }
+
+  /* ---------- Ausgabe ---------- */
+
+  function copy(silent) {
+    var t = textEl.value;
+    if (!t) { if (!silent) { toast('Noch nichts diktiert.'); } return; }
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(t).then(function () {
+        if (!silent) { toast('In die Zwischenablage kopiert'); }
+      })['catch'](function () {
+        if (!silent) { toast('Kopieren wurde vom Browser abgelehnt'); }
+      });
+    } else if (!silent) {
+      textEl.select();
+      toast('Bitte mit Strg+C kopieren');
+    }
+  }
+
+  function download(ext, mime) {
+    var t = textEl.value;
+    if (!t.trim()) { toast('Noch nichts diktiert.'); return; }
+    var d = new Date();
+    var stamp = d.getFullYear() + '-' +
+      String(d.getMonth() + 1).padStart(2, '0') + '-' +
+      String(d.getDate()).padStart(2, '0') + '_' +
+      String(d.getHours()).padStart(2, '0') + '-' +
+      String(d.getMinutes()).padStart(2, '0');
+    var blob = new Blob([t], { type: mime + ';charset=utf-8' });
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement('a');
+    a.href = url;
+    a.download = 'diktat_' + stamp + '.' + ext;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
+    toast('Gespeichert als ' + a.download);
+  }
+
+  /* ---------- Einstellungen merken ---------- */
+
+  var OPT_IDS = ['optFormat', 'optCommands', 'optFiller', 'optSave', 'optClip'];
+
+  function saveOpts() {
+    var o = {};
+    OPT_IDS.forEach(function (id) { o[id] = $(id).checked; });
+    o.lang = $('lang').value;
+    store(STORE_OPTS, JSON.stringify(o));
+  }
+
+  function loadOpts() {
+    var raw = store(STORE_OPTS);
+    if (!raw) { return; }
+    try {
+      var o = JSON.parse(raw);
+      OPT_IDS.forEach(function (id) { if (typeof o[id] === 'boolean') { $(id).checked = o[id]; } });
+      if (o.lang) { $('lang').value = o.lang; }
+    } catch (e) {}
+  }
+
+  /* ---------- Verdrahtung ---------- */
+
+  micBtn.addEventListener('click', function () { wantListening ? stop() : start(); });
+
+  $('lang').addEventListener('change', function () {
+    renderCommands();
+    saveOpts();
+    if (wantListening) { stop(); setTimeout(start, 350); }
+  });
+
+  OPT_IDS.forEach(function (id) { $(id).addEventListener('change', saveOpts); });
+
+  $('optSave').addEventListener('change', function () {
+    if (this.checked) { store(STORE_TEXT, textEl.value); }
+  });
+
+  textEl.addEventListener('input', afterChange);
+
+  $('copyBtn').addEventListener('click', function () { copy(false); });
+  $('txtBtn').addEventListener('click', function () { download('txt', 'text/plain'); });
+  $('mdBtn').addEventListener('click', function () { download('md', 'text/markdown'); });
+
+  $('undoBtn').addEventListener('click', function () {
+    if (lastInsert && textEl.value === lastInsert.after) {
+      textEl.value = lastInsert.before;
+      lastInsert = null;
+      afterChange();
+      toast('Letzte Passage entfernt');
+    } else {
+      toast('Nichts zum Zurücknehmen');
+    }
+  });
+
+  $('clearBtn').addEventListener('click', function () {
+    if (!textEl.value) { return; }
+    if (confirm('Den gesamten Text löschen?')) {
+      textEl.value = '';
+      lastInsert = null;
+      afterChange();
+    }
+  });
+
+  document.addEventListener('keydown', function (e) {
+    if ((e.ctrlKey || e.metaKey) && (e.key === 'm' || e.key === 'M')) {
+      e.preventDefault();
+      wantListening ? stop() : start();
+    } else if (e.key === 'Escape' && wantListening) {
+      stop();
+    }
+  });
+
+  // Hell / Dunkel
+  var themeBtn = $('themeBtn');
+  var savedTheme = store(STORE_THEME);
+  if (savedTheme) { document.documentElement.setAttribute('data-theme', savedTheme); }
+  themeBtn.addEventListener('click', function () {
+    var isDark = matchMedia('(prefers-color-scheme: dark)').matches;
+    var current = document.documentElement.getAttribute('data-theme') || (isDark ? 'dark' : 'light');
+    var next = current === 'dark' ? 'light' : 'dark';
+    document.documentElement.setAttribute('data-theme', next);
+    store(STORE_THEME, next);
+  });
+
+  window.addEventListener('beforeunload', function (e) {
+    if (wantListening) { stop(); }
+    if (textEl.value.trim() && !$('optSave').checked) {
+      e.preventDefault();
+      e.returnValue = '';
+    }
+  });
+
+  // Start
+  loadOpts();
+  renderCommands();
+  var restored = $('optSave').checked ? store(STORE_TEXT) : null;
+  if (restored) {
+    textEl.value = restored;
+    setStatus('Letzter Text wiederhergestellt.');
+  }
+  afterChange();
+})();
+</script>
+</body>
+</html>
